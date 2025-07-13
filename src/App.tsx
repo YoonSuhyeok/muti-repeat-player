@@ -1,21 +1,39 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-import Component from "./music-player";
+import MusicPlayer from "./music-player";
+import FileList from "./components/file-list";
+
+interface AudioFile {
+  id: string
+  name: string
+  file?: File
+  url: string
+  duration?: number
+  size: number
+  path?: string
+}
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [selectedFile, setSelectedFile] = useState<AudioFile | null>(null);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  const handleFileSelect = (file: AudioFile) => {
+    setSelectedFile(file);
+  };
+
+  const handleBackToList = () => {
+    setSelectedFile(null);
+  };
 
   return (
-    <main className="container">
-      <Component />
+    <main className="min-h-screen">
+      {selectedFile ? (
+        <MusicPlayer 
+          selectedFile={selectedFile} 
+          onBackToList={handleBackToList}
+        />
+      ) : (
+        <FileList onFileSelect={handleFileSelect} />
+      )}
     </main>
   );
 }

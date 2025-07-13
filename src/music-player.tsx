@@ -20,6 +20,7 @@ import {
   ListMusic,
   Palette,
   Settings2,
+  ArrowLeft,
 } from "lucide-react"
 import { parseBlob } from "music-metadata-browser"
 import { cn } from "@/lib/utils"
@@ -54,12 +55,27 @@ interface TrackInfo {
   thumbnail: string | null
 }
 
-export default function Component() {
+interface AudioFile {
+  id: string
+  name: string
+  file?: File
+  url: string
+  duration?: number
+  size: number
+  path?: string
+}
+
+interface MusicPlayerProps {
+  selectedFile: AudioFile
+  onBackToList: () => void
+}
+
+export default function MusicPlayer({ selectedFile, onBackToList }: MusicPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioFileInputRef = useRef<HTMLInputElement>(null)
-  const [audioFile, setAudioFile] = useState<File | null>(null)
-  const [audioUrl, setAudioUrl] = useState<string>("https://www.soundjay.com/misc/sounds/bell-ringing-05.wav")
+  const [audioFile, setAudioFile] = useState<File | null>(selectedFile.file || null)
+  const [audioUrl, setAudioUrl] = useState<string>(selectedFile.url)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -69,14 +85,27 @@ export default function Component() {
   const [newSectionName, setNewSectionName] = useState("")
   const [startTime, setStartTime] = useState(0)
   const [endTime, setEndTime] = useState(0)
-  const [editingSection, setEditingSection] = useState<string | null>(null)
   const [showMetadata, setShowMetadata] = useState(false)
   const [trackInfo, setTrackInfo] = useState<TrackInfo>({
-    title: "샘플 음악",
+    title: selectedFile.name.replace(/\.[^/.]+$/, ""), // 확장자 제거
     artist: "알 수 없는 아티스트",
     thumbnail: null,
   })
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
+
+  // 선택된 파일이 변경될 때 메타데이터 로드
+  useEffect(() => {
+    if (selectedFile.file) {
+      extractMetadata(selectedFile.file)
+    } else if (selectedFile.path) {
+      // Tauri에서 가져온 파일의 경우 메타데이터 로딩을 스킵하거나 다른 방식으로 처리
+      setTrackInfo({
+        title: selectedFile.name.replace(/\.[^/.]+$/, ""),
+        artist: "알 수 없는 아티스트",
+        thumbnail: null,
+      })
+    }
+  }, [selectedFile])
 
   const colorPalette = [
     { name: "Red", bg: "bg-red-500/30", border: "border-red-500/50", solid: "bg-red-500", text: "text-red-500" },
@@ -234,10 +263,10 @@ export default function Component() {
     if (files.length > 0) {
       const file = files[0]
       if (file.type.startsWith("audio/")) {
-        const fakeEvent = {
-          target: { files: [file] },
-        } as React.ChangeEvent<HTMLInputElement>
-        handleAudioFileUpload(fakeEvent)
+        // Drag & Drop으로 받은 파일을 직접 처리
+        setAudioFile(file)
+        setAudioUrl(URL.createObjectURL(file))
+        extractMetadata(file)
       }
     }
   }
@@ -416,7 +445,15 @@ export default function Component() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-slate-50 p-4 sm:p-6 lg:p-8">
       <div className="w-full max-w-5xl mx-auto space-y-6 sm:space-y-8">
-        <header className="text-center">
+        <header className="text-center relative">
+          <Button
+            onClick={onBackToList}
+            variant="outline"
+            className="absolute left-0 top-1/2 transform -translate-y-1/2 border-slate-600 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-slate-100"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            목록으로
+          </Button>
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500">
             구간 반복 마스터
           </h1>
@@ -677,9 +714,6 @@ export default function Component() {
                   step={0.1}
                   onValueChange={handleSeek}
                   className="w-full absolute top-1/2 -translate-y-1/2 z-10"
-                  thumbClassName="w-4 h-4 sm:w-5 sm:h-5 bg-pink-500 border-2 border-slate-900"
-                  trackClassName="bg-slate-600 h-2 sm:h-2.5" // 트랙 배경색 어둡게, 두께 증가
-                  rangeClassName="bg-pink-500 h-2 sm:h-2.5" // 진행 부분 두께 증가
                 />
                 {/* 구간 표시 오버레이 */}
                 <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-2 sm:h-2.5 rounded-md overflow-hidden pointer-events-none z-20">
@@ -794,9 +828,6 @@ export default function Component() {
                       max={duration || 100}
                       step={0.1}
                       onValueChange={(value) => setStartTime(value[0])}
-                      thumbClassName="bg-pink-500"
-                      trackClassName="bg-slate-500"
-                      rangeClassName="bg-pink-500"
                     />
                   </div>
                   <div className="space-y-1 sm:space-y-1.5">
@@ -806,9 +837,6 @@ export default function Component() {
                       max={duration || 100}
                       step={0.1}
                       onValueChange={(value) => setEndTime(value[0])}
-                      thumbClassName="bg-pink-500"
-                      trackClassName="bg-slate-500"
-                      rangeClassName="bg-pink-500"
                     />
                   </div>
                 </div>
